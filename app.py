@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 import joblib
 from sklearn.base import BaseEstimator, TransformerMixin
-# from sklearn.pipeline import Pipeline # Tidak digunakan secara langsung di app.py setelah load
-# from sklearn.preprocessing import LabelEncoder # Tidak digunakan secara langsung di app.py setelah load
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
 
 # --- Define Custom Transformers (MUST be the same as in training script) ---
 # Ensure these classes are identical to those in your training script
@@ -21,8 +21,8 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         # Use .div() and fillna for division by zero/NaNs
         X['approval_rate_1st'] = X['Curricular_units_1st_sem_approved'].div(X['Curricular_units_1st_sem_enrolled'].replace(0, np.nan)).fillna(0)
         X['approval_rate_2nd'] = X['Curricular_units_2nd_sem_approved'].div(X['Curricular_units_2nd_sem_enrolled'].replace(0, np.nan)).fillna(0)
-        X['parental_education_avg'] = (X['Fathers_qualification'] + X['Mothers_qualification']) / 2
-        X['parental_occupation_avg'] = (X['Fathers_occupation'] + X['Mothers_occupation']) / 2
+        X['parental_education_avg'] = (X['Fathers_qualification'] + X['Mothers_qualification']) / 2 # Corrected typo Mothers_qualification
+        X['parental_occupation_avg'] = (X['Fathers_occupation'] + X['Mothers_occupation']) / 2   # Corrected typo Mothers_occupation
         X['low_income_flag'] = ((X['Scholarship_holder'] == 1) & (X['Tuition_fees_up_to_date'] == 0)).astype(int)
         X['foreign_and_displaced'] = ((X['International'] == 1) | (X['Displaced'] == 1)).astype(int)
         X['no_eval_first_sem'] = (X['Curricular_units_1st_sem_without_evaluations'] > 0).astype(int)
@@ -52,14 +52,10 @@ try:
 except FileNotFoundError:
     st.error("Model files not found. Please run the training script first to generate 'random_forest_pipeline.pkl' and 'label_encoder.pkl'.")
     st.stop() # Stop the app if files are not found
-except Exception as e:
-    st.error(f"An error occurred while loading model files: {e}")
-    st.stop()
 
 # --- Streamlit App Interface ---
-st.set_page_config(layout="wide") # Use wide layout for more space
-st.title("Prediksi Status Mahasiswa (Dropout/Lulus)")
-st.write("Masukkan detail mahasiswa untuk memprediksi apakah mereka akan menjadi Dropout atau Lulus.")
+st.title("Student Status Prediction (Dropout/Graduate)")
+st.write("Enter student details to predict if they will be a Dropout or a Graduate.")
 
 # Define the list of all original feature columns
 original_feature_cols = [
@@ -83,243 +79,333 @@ original_feature_cols = [
     'Inflation_rate', 'GDP'
 ]
 
-# Create input widgets for each feature
-input_values = {}
+# --- Dictionaries for Categorical Mapping
+marital_status_map = {
+    'Single': 1,
+    'Married': 2,
+    'Widower': 3,
+    'Divorced': 4,
+    'Facto Union': 5,
+    'Legally Separated': 6
+}
 
-st.header("Informasi Pribadi & Aplikasi Mahasiswa")
+application_mode_map = {
+    '1st phase - general contingent': 1,
+    'Ordinance No. 612/93': 2,
+    '1st phase - special contingent (Azores Island)': 5,
+    'Holders of other higher courses': 7,
+    'Ordinance No. 854-B/99': 10,
+    'International student (bachelor)': 15,
+    '1st phase - special contingent (Madeira Island)': 16,
+    '2nd phase - general contingent': 17,
+    '3rd phase - general contingent': 18,
+    'Ordinance No. 533-A/99, item b2) (Different Plan)': 26,
+    'Ordinance No. 533-A/99, item b3 (Other Institution)': 27,
+    'Over 23 years old': 39,
+    'Transfer': 42,
+    'Change of course': 43,
+    'Technological specialization diploma holders': 44,
+    'Change of institution/course': 51,
+    'Short cycle diploma holders': 53,
+    'Change of institution/course (International)': 57
+}
+
+course_map = {
+    'Biofuel Production Technologies': 33,
+    'Animation and Multimedia Design': 171,
+    'Social Service (evening attendance)': 8014,
+    'Agronomy': 9003,
+    'Communication Design': 9070,
+    'Veterinary Nursing': 9085,
+    'Informatics Engineering': 9119,
+    'Equinculture': 9130,
+    'Management': 9147,
+    'Social Service': 9238,
+    'Tourism': 9254,
+    'Nursing': 9500,
+    'Oral Hygiene': 9556,
+    'Advertising and Marketing Management': 9670,
+    'Journalism and Communication': 9773,
+    'Basic Education': 9853,
+    'Management (evening attendance)': 9991
+}
+
+attendance_map = {'Daytime': 1, 'Evening': 0}
+
+prev_qual_map = {
+    'Secondary education': 1,
+    "Higher education - bachelor's degree": 2,
+    'Higher education - degree': 3,
+    "Higher education - master's": 4,
+    'Higher education - doctorate': 5,
+    'Frequency of higher education': 6,
+    '12th year of schooling - not completed': 9,
+    '11th year of schooling - not completed': 10,
+    'Other - 11th year of schooling': 12,
+    '10th year of schooling': 14,
+    '10th year of schooling - not completed': 15,
+    'Basic education 3rd cycle (9th/10th/11th year) or equiv.': 19,
+    'Basic education 2nd cycle (6th/7th/8th year) or equiv.': 38,
+    'Technological specialization course': 39,
+    'Higher education - degree (1st cycle)': 40,
+    'Professional higher technical course': 42,
+    'Higher education - master (2nd cycle)': 43
+}
+
+nationality_map = {
+    'Portuguese': 1, 'German': 2, 'Spanish': 6, 'Italian': 11,
+    'Dutch': 13, 'English': 14, 'Lithuanian': 17, 'Angolan': 21,
+    'Cape Verdean': 22, 'Guinean': 24, 'Mozambican': 25, 'Santomean': 26,
+    'Turkish': 32, 'Brazilian': 41, 'Romanian': 62, 'Moldova (Republic of)': 100,
+    'Mexican': 101, 'Ukrainian': 103, 'Russian': 105, 'Cuban': 108,
+    'Colombian': 109
+}
+
+parent_qual_map = {
+    "Secondary Education - 12th Year of Schooling or Eq.": 1,
+    "Higher Education - Bachelor's Degree": 2,
+    "Higher Education - Degree": 3,
+    "Higher Education - Master's": 4,
+    "Higher Education - Doctorate": 5,
+    "Frequency of Higher Education": 6,
+    "12th Year of Schooling - Not Completed": 9,
+    "11th Year of Schooling - Not Completed": 10,
+    "7th Year (Old)": 11,
+    "Other - 11th Year of Schooling": 12,
+    "10th Year of Schooling": 14,
+    "General commerce course": 18,
+    "Basic Education 3rd Cycle (9th/10th/11th Year) or Equiv.": 19,
+    "Technical-professional course": 22,
+    "7th year of schooling": 26,
+    "2nd cycle of the general high school course": 27,
+    "9th Year of Schooling - Not Completed": 29,
+    "8th year of schooling": 30,
+    "Unknown": 34,
+    "Can't read or write": 35,
+    "Can read without having a 4th year of schooling": 36,
+    "Basic education 1st cycle (4th/5th year) or equiv.": 37,
+    "Basic Education 2nd Cycle (6th/7th/8th Year) or Equiv.": 38,
+    "Technological specialization course": 39,
+    "Higher education - degree (1st cycle)": 40,
+    "Specialized higher studies course": 41,
+    "Professional higher technical course": 42,
+    "Higher Education - Master (2nd cycle)": 43,
+    "Higher Education - Doctorate (3rd cycle)": 44,
+    "2nd year complementary high school course": 13,
+    "Complementary High School Course": 20,
+    "Complementary High School Course - not concluded": 25,
+    "General Course of Administration and Commerce": 31,
+    "Supplementary Accounting and Administration": 33
+}
+
+parent_job_map = {
+    "Student": 0,
+    "Representatives of the Legislative Power and Executive Bodies, Directors, Directors and Executive Managers": 1,
+    "Specialists in Intellectual and Scientific Activities": 2,
+    "Intermediate Level Technicians and Professions": 3,
+    "Administrative staff": 4,
+    "Personal Services, Security and Safety Workers and Sellers": 5,
+    "Farmers and Skilled Workers in Agriculture, Fisheries and Forestry": 6,
+    "Skilled Workers in Industry, Construction and Craftsmen": 7,
+    "Installation and Machine Operators and Assembly Workers": 8,
+    "Unskilled Workers": 9,
+    "Armed Forces Professions": 10,
+    "Other Situation": 90,
+    "(blank)": 99, 
+    "Health professionals": 122,
+    "Teachers": 123,
+    "Specialists in information and communication technologies (ICT)": 125,
+    "Intermediate level science and engineering technicians and professions": 131,
+    "Technicians and professionals, of intermediate level of health": 132,
+    "Intermediate level technicians from legal, social, sports, cultural and similar services": 134,
+    "Office workers, secretaries in general and data processing operators": 141,
+    "Data, accounting, statistical, financial services and registry-related operators": 143,
+    "Other administrative support staff": 144,
+    "Personal service workers": 151,
+    "Sellers": 152,
+    "Personal care workers and the like": 153,
+    "Skilled construction workers and the like, except electricians": 171,
+    "Skilled workers in printing, precision instrument manufacturing, jewelers, artisans and the like": 173,
+    "Workers in food processing, woodworking, clothing and other industries and crafts": 175,
+    "Cleaning workers": 191,
+    "Unskilled workers in agriculture, animal production, fisheries and forestry": 192,
+    "Unskilled workers in extractive industry, construction, manufacturing and transport": 193,
+    "Meal preparation assistants": 194,
+    "Armed Forces Officers": 101,
+    "Armed Forces Sergeants": 102,
+    "Other Armed Forces personnel": 103,
+    "Directors of administrative and commercial services": 112,
+    "Hotel, catering, trade and other services directors": 114,
+    "Specialists in the physical sciences, mathematics, engineering and related techniques": 121,
+    "Specialists in finance, accounting, administrative organization, public and commercial relations": 124,
+    "Information and communication technology technicians": 135,
+    "Protection and security services personnel": 154,
+    "Market-oriented farmers and skilled agricultural and animal production workers": 161,
+    "Farmers, livestock keepers, fishermen, hunters and gatherers, subsistence": 163,
+    "Skilled workers in metallurgy, metalworking and similar": 172,
+    "Skilled workers in electricity and electronics": 174,
+    "Fixed plant and machine operators": 181,
+    "Assembly workers": 182,
+    "Vehicle drivers and mobile equipment operators": 183,
+    "Street vendors (except food) and street service providers": 195
+}
+
+boolean_map = {'Yes': 1, 'No': 0}
+gender_map = {'Male': 1, 'Female': 0}
+
+# --- Streamlit App Layout ---
+st.set_page_config(layout="wide") # Use wider layout
+st.title("🎓 Student Outcome Prediction")
+st.write("""
+This app predicts whether a student is likely to drop out, stay enrolled, or graduate
+based on their academic and demographic information. Please input the student details on the sidebar and click predict.
+""")
+
+st.sidebar.header("Input Student Information")
+
 col1, col2 = st.columns(2)
+
 with col1:
-    input_values['Marital_status'] = st.number_input(
-        "Status Pernikahan", min_value=1, max_value=6, value=1,
-        help="Status pernikahan mahasiswa.\n1: Lajang, 2: Menikah, 3: Duda/Janda, 4: Cerai, 5: Hidup Bersama, 6: Terpisah Secara Hukum"
-    )
-    input_values['Application_mode'] = st.number_input(
-        "Mode Aplikasi", min_value=1, value=1,
-        help="Metode aplikasi yang digunakan.\nContoh:\n1: Fase 1 - kontingen umum\n7: Pemegang ijazah kursus tinggi lainnya\n15: Mahasiswa internasional (sarjana)\n39: Di atas 23 tahun\n42: Transfer\n43: Pindah jurusan\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Application_order'] = st.number_input(
-        "Urutan Aplikasi", min_value=0, max_value=9, value=1,
-        help="Urutan pilihan aplikasi (0: pilihan pertama, 9: pilihan terakhir)."
-    )
-    input_values['Course'] = st.number_input(
-        "Kode Program Studi", min_value=0, value=9119,
-        help="Kode program studi yang diambil.\nContoh:\n33: Teknologi Produksi Biofuel\n171: Desain Animasi dan Multimedia\n9119: Teknik Informatika\n9500: Keperawatan\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Daytime_evening_attendance'] = st.selectbox(
-        "Waktu Perkuliahan", options=[1, 0],
-        format_func=lambda x: 'Siang (Daytime)' if x == 1 else 'Malam (Evening)',
-        help="Apakah mahasiswa menghadiri kelas di siang atau malam hari.\n1: Siang, 0: Malam"
-    )
-    input_values['Nacionality'] = st.number_input(
-        "Kewarganegaraan", min_value=1, value=1,
-        help="Kewarganegaraan mahasiswa.\nContoh:\n1: Portugis\n21: Angola\n41: Brazil\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Age_at_enrollment'] = st.number_input(
-        "Usia Saat Pendaftaran", min_value=15, max_value=70, value=18,
-        help="Usia mahasiswa pada saat pendaftaran."
-    )
+    marital_status = st.sidebar.selectbox("Marital Status", list(marital_status_map.keys()))
+    nacionality_desc = st.sidebar.selectbox("Nationality", list(nationality_map.keys()), index=0) # Default to Portuguese
+    gender = st.sidebar.radio("Gender", list(gender_map.keys()))
+    age = st.sidebar.slider("Age at Enrollment", 17, 70, 20) # Min age based on typical enrollment
+    displaced = st.sidebar.radio("Is the student displaced?", list(boolean_map.keys()), index=1) # Default No
+    special_needs = st.sidebar.radio("Educational Special Needs?", list(boolean_map.keys()), index=1) # Default No
+    international = st.sidebar.radio("International Student?", list(boolean_map.keys()), index=1) # Default No
+
+    application_mode = st.sidebar.selectbox("Application Mode", list(application_mode_map.keys()))
+    application_order = st.sidebar.slider("Application Order (0 = 1st choice)", 0, 9, 0)
+    course = st.sidebar.selectbox("Course", list(course_map.keys()))
+    attendance = st.sidebar.radio("Class Attendance", list(attendance_map.keys()))
+    admission_grade = st.sidebar.slider("Admission Grade", 0, 200, 140) # Default 140
+    prev_qualification_desc = st.sidebar.selectbox("Previous Qualification", list(prev_qual_map.keys()), index=0) # Default Secondary
+    prev_grade = st.sidebar.slider("Previous Qualification Grade", 0, 200, 140) # Default 140
 
 with col2:
-    input_values['Previous_qualification'] = st.number_input(
-        "Kualifikasi Sebelumnya", min_value=1, value=1,
-        help="Kualifikasi yang diperoleh sebelum mendaftar di pendidikan tinggi.\nContoh:\n1: Pendidikan menengah\n2: Pendidikan tinggi - Sarjana (S1)\n39: Kursus spesialisasi teknologi\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Previous_qualification_grade'] = st.number_input(
-        "Nilai Kualifikasi Sebelumnya", min_value=0.0, max_value=200.0, value=120.0,
-        help="Nilai kualifikasi sebelumnya (antara 0 dan 200)."
-    )
-    input_values['Admission_grade'] = st.number_input(
-        "Nilai Penerimaan", min_value=0.0, max_value=200.0, value=120.0,
-        help="Nilai penerimaan mahasiswa (antara 0 dan 200)."
-    )
-    input_values['Gender'] = st.selectbox(
-        "Jenis Kelamin", options=[1, 0],
-        format_func=lambda x: 'Laki-laki' if x == 1 else 'Perempuan', # Disesuaikan dengan deskripsi tabel: 1 – male 0 – female
-        help="Jenis kelamin mahasiswa.\n1: Laki-laki, 0: Perempuan"
-    )
-    input_values['International'] = st.selectbox(
-        "Mahasiswa Internasional", options=[0, 1],
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah mahasiswa tersebut adalah mahasiswa internasional.\n1: Ya, 0: Tidak"
-    )
-    input_values['Displaced'] = st.selectbox(
-        "Mahasiswa Pindahan/Displaced", options=[0, 1],
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah mahasiswa tersebut adalah orang yang dipindahkan (displaced).\n1: Ya, 0: Tidak"
-    )
-    input_values['Educational_special_needs'] = st.selectbox(
-        "Kebutuhan Pendidikan Khusus", options=[0, 1],
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah mahasiswa memiliki kebutuhan pendidikan khusus.\n1: Ya, 0: Tidak"
-    )
+    mother_qual_desc = st.sidebar.selectbox("Mother's Qualification", list(parent_qual_map.keys()), index=0)
+    father_qual_desc = st.sidebar.selectbox("Father's Qualification", list(parent_qual_map.keys()), index=0)
+    mother_job_desc = st.sidebar.selectbox("Mother's Occupation", list(parent_job_map.keys()), index=11) # Default to (blank) or common category
+    father_job_desc = st.sidebar.selectbox("Father's Occupation", list(parent_job_map.keys()), index=11) # Default to (blank) or common category
+
+    debtor = st.sidebar.radio("Is the student a debtor?", list(boolean_map.keys()), index=1) # Default No
+    fees_up_to_date = st.sidebar.radio("Tuition Fees Up To Date?", list(boolean_map.keys()), index=0) # Default Yes
+    scholarship = st.sidebar.radio("Scholarship Holder?", list(boolean_map.keys()), index=1) # Default No
+
+    cred_1st = st.sidebar.slider("1st Sem: Credited Units", 0, 30, 0) 
+    enr_1st = st.sidebar.slider("1st Sem: Enrolled Units", 0, 30, 6)   
+    eval_1st = st.sidebar.slider("1st Sem: Evaluated Units", 0, 30, 6) 
+    appr_1st = st.sidebar.slider("1st Sem: Approved Units", 0, 30, 5) 
+    grade_1st = st.sidebar.slider("1st Sem: Average Grade", 0.0, 20.0, 12.0, step=0.1) 
+    no_eval_1st = st.sidebar.slider("1st Sem: Units Without Evaluation", 0, 30, 0)
+
+    cred_2nd = st.sidebar.slider("2nd Sem: Credited Units", 0, 30, 0) 
+    enr_2nd = st.sidebar.slider("2nd Sem: Enrolled Units", 0, 30, 6)   
+    eval_2nd = st.sidebar.slider("2nd Sem: Evaluated Units", 0, 30, 6) 
+    appr_2nd = st.sidebar.slider("2nd Sem: Approved Units", 0, 30, 5)  
+    grade_2nd = st.sidebar.slider("2nd Sem: Average Grade", 0.0, 20.0, 12.0, step=0.1)
+    no_eval_2nd = st.sidebar.slider("2nd Sem: Units Without Evaluation", 0, 30, 0) 
+
+    unemployment_rate = st.sidebar.slider("Unemployment Rate (%)", 0.0, 20.0, 10.0, step=0.1)
+    inflation_rate = st.sidebar.slider("Inflation Rate (%)", -5.0, 10.0, 1.5, step=0.1)
+    gdp = st.sidebar.slider("GDP Growth Rate (%)", -10.0, 10.0, 0.5, step=0.1)
+
+# Map selected descriptions back to codes
+nationality_code = nationality_map[nacionality_desc]
+prev_qualification_code = prev_qual_map[prev_qualification_desc]
+mother_qual_code = parent_qual_map[mother_qual_desc]
+father_qual_code = parent_qual_map[father_qual_desc]
+mother_job_code = parent_job_map[mother_job_desc]
+father_job_code = parent_job_map[father_job_desc]
 
 
-st.header("Informasi Orang Tua")
-col_parents1, col_parents2 = st.columns(2)
-with col_parents1:
-    input_values['Mothers_qualification'] = st.number_input(
-        "Kualifikasi Ibu", min_value=1, value=1,
-        help="Kualifikasi pendidikan ibu.\nContoh:\n1: Pendidikan Menengah\n2: Sarjana (S1)\n37: Pendidikan Dasar Siklus 1 (SD kelas 4/5)\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Mothers_occupation'] = st.number_input(
-        "Pekerjaan Ibu", min_value=0, value=5,
-        help="Pekerjaan ibu.\n0: Pelajar\n1: Pejabat Legislatif/Eksekutif, Direktur\n5: Pekerja Jasa Pribadi, Keamanan, Penjual\n9: Pekerja Tidak Terampil\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-with col_parents2:
-    input_values['Fathers_qualification'] = st.number_input(
-        "Kualifikasi Ayah", min_value=1, value=1,
-        help="Kualifikasi pendidikan ayah.\nContoh:\n1: Pendidikan Menengah\n2: Sarjana (S1)\n37: Pendidikan Dasar Siklus 1 (SD kelas 4/5)\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
-    input_values['Fathers_occupation'] = st.number_input(
-        "Pekerjaan Ayah", min_value=0, value=5,
-        help="Pekerjaan ayah.\n0: Pelajar\n1: Pejabat Legislatif/Eksekutif, Direktur\n5: Pekerja Jasa Pribadi, Keamanan, Penjual\n9: Pekerja Tidak Terampil\nLainnya: Lihat dokumentasi untuk kode lengkap."
-    )
+input_data_list = [
+    marital_status_map[marital_status],
+    application_mode_map[application_mode],
+    application_order,
+    course_map[course],
+    attendance_map[attendance],
+    prev_qualification_code, 
+    prev_grade,
+    nationality_code,       
+    mother_qual_code,        
+    father_qual_code,        
+    mother_job_code,         
+    father_job_code,         
+    admission_grade,
+    boolean_map[displaced],
+    boolean_map[special_needs],
+    boolean_map[debtor],
+    boolean_map[fees_up_to_date],
+    gender_map[gender],
+    boolean_map[scholarship],
+    age,
+    boolean_map[international],
+    cred_1st,
+    enr_1st,
+    eval_1st,
+    appr_1st,
+    grade_1st,               
+    no_eval_1st,            
+    cred_2nd,               
+    enr_2nd,                 
+    eval_2nd,                
+    appr_2nd,                
+    grade_2nd,               
+    no_eval_2nd,             
+    unemployment_rate,       
+    inflation_rate,          
+    gdp                      
+]
 
+# Convert to NumPy array with the correct shape (1 row, N columns)
+input_data = np.array([input_data_list])
 
-st.header("Status Finansial & Beasiswa")
-col_fin1, col_fin2 = st.columns(2)
-with col_fin1:
-    input_values['Debtor'] = st.selectbox(
-        "Memiliki Tunggakan", options=[0, 1],
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah mahasiswa memiliki tunggakan pembayaran.\n1: Ya, 0: Tidak"
-    )
-    input_values['Tuition_fees_up_to_date'] = st.selectbox(
-        "Biaya Kuliah Lunas", options=[1, 0], # Sesuai deskripsi, 1 yes, 0 no
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah biaya kuliah mahasiswa sudah lunas/terbaru.\n1: Ya, 0: Tidak"
-    )
-with col_fin2:
-    input_values['Scholarship_holder'] = st.selectbox(
-        "Penerima Beasiswa", options=[0, 1],
-        format_func=lambda x: 'Ya' if x == 1 else 'Tidak',
-        help="Apakah mahasiswa adalah penerima beasiswa.\n1: Ya, 0: Tidak"
-    )
-
-
-st.header("Kinerja Akademik (Semester 1)")
-col5, col6 = st.columns(2)
-with col5:
-    input_values['Curricular_units_1st_sem_credited'] = st.number_input(
-        "SKS Diakui Sem 1", min_value=0, value=0,
-        help="Jumlah satuan kredit semester (SKS) yang diakui/dikreditkan di semester pertama."
-    )
-    input_values['Curricular_units_1st_sem_enrolled'] = st.number_input(
-        "SKS Diambil Sem 1", min_value=0, value=6,
-        help="Jumlah SKS yang diambil/terdaftar di semester pertama."
-    )
-    input_values['Curricular_units_1st_sem_evaluations'] = st.number_input(
-        "SKS Dievaluasi Sem 1", min_value=0, value=6,
-        help="Jumlah SKS yang dievaluasi di semester pertama."
-    )
-with col6:
-    input_values['Curricular_units_1st_sem_approved'] = st.number_input(
-        "SKS Lulus Sem 1", min_value=0, value=6,
-        help="Jumlah SKS yang berhasil dilulusi di semester pertama."
-    )
-    input_values['Curricular_units_1st_sem_grade'] = st.number_input(
-        "Rata-rata Nilai Sem 1", min_value=0.0, max_value=20.0, value=14.0, # Asumsi skala 0-20, sesuaikan jika beda
-        help="Rata-rata nilai mahasiswa untuk semester pertama."
-    )
-    input_values['Curricular_units_1st_sem_without_evaluations'] = st.number_input(
-        "SKS Tanpa Evaluasi Sem 1", min_value=0, value=0,
-        help="Jumlah SKS tanpa evaluasi di semester pertama."
-    )
-
-st.header("Kinerja Akademik (Semester 2)")
-col7, col8 = st.columns(2)
-with col7:
-    input_values['Curricular_units_2nd_sem_credited'] = st.number_input(
-        "SKS Diakui Sem 2", min_value=0, value=0,
-        help="Jumlah SKS yang diakui/dikreditkan di semester kedua."
-    )
-    input_values['Curricular_units_2nd_sem_enrolled'] = st.number_input(
-        "SKS Diambil Sem 2", min_value=0, value=6,
-        help="Jumlah SKS yang diambil/terdaftar di semester kedua."
-    )
-    input_values['Curricular_units_2nd_sem_evaluations'] = st.number_input(
-        "SKS Dievaluasi Sem 2", min_value=0, value=6,
-        help="Jumlah SKS yang dievaluasi di semester kedua."
-    )
-with col8:
-    input_values['Curricular_units_2nd_sem_approved'] = st.number_input(
-        "SKS Lulus Sem 2", min_value=0, value=6,
-        help="Jumlah SKS yang berhasil dilulusi di semester kedua."
-    )
-    input_values['Curricular_units_2nd_sem_grade'] = st.number_input(
-        "Rata-rata Nilai Sem 2", min_value=0.0, max_value=20.0, value=14.0, # Asumsi skala 0-20, sesuaikan jika beda
-        help="Rata-rata nilai mahasiswa untuk semester kedua."
-    )
-    input_values['Curricular_units_2nd_sem_without_evaluations'] = st.number_input(
-        "SKS Tanpa Evaluasi Sem 2", min_value=0, value=0,
-        help="Jumlah SKS tanpa evaluasi di semester kedua."
-    )
-
-st.header("Faktor Makroekonomi")
-col9, col10, col11 = st.columns(3) # Menggunakan 3 kolom agar lebih rapi
-with col9:
-    input_values['Unemployment_rate'] = st.number_input(
-        "Tingkat Pengangguran (%)", value=10.0, step=0.1,
-        help="Tingkat pengangguran saat pendaftaran mahasiswa."
-    )
-with col10:
-    input_values['Inflation_rate'] = st.number_input(
-        "Tingkat Inflasi (%)", value=1.0, step=0.1,
-        help="Tingkat inflasi saat pendaftaran mahasiswa."
-    )
-with col11:
-    input_values['GDP'] = st.number_input(
-        "PDB (GDP)", value=0.0, step=0.1,
-        help="Produk Domestik Bruto (GDP) saat pendaftaran mahasiswa."
-    )
-
+# Define the list of all original feature columns
+original_feature_cols = [
+    'Marital_status', 'Application_mode', 'Application_order', 'Course',
+    'Daytime_evening_attendance', 'Previous_qualification',
+    'Previous_qualification_grade', 'Nacionality', 'Mothers_qualification',
+    'Fathers_qualification', 'Mothers_occupation', 'Fathers_occupation',
+    'Admission_grade', 'Displaced', 'Educational_special_needs', 'Debtor',
+    'Tuition_fees_up_to_date', 'Gender', 'Scholarship_holder',
+    'Age_at_enrollment', 'International',
+    'Curricular_units_1st_sem_credited',
+    'Curricular_units_1st_sem_enrolled',
+    'Curricular_units_1st_sem_evaluations',
+    'Curricular_units_1st_sem_approved', 'Curricular_units_1st_sem_grade',
+    'Curricular_units_1st_sem_without_evaluations',
+    'Curricular_units_2nd_sem_credited',
+    'Curricular_units_2nd_sem_enrolled',
+    'Curricular_units_2nd_sem_evaluations',
+    'Curricular_units_2nd_sem_approved', 'Curricular_units_2nd_sem_grade',
+    'Curricular_units_2nd_sem_without_evaluations', 'Unemployment_rate',
+    'Inflation_rate', 'GDP'
+]
 
 # --- Prediction ---
-if st.button("Prediksi Status", type="primary", use_container_width=True):
+if st.button("Predict Status"):
     # Create a DataFrame from input values with the EXACT original column order
-    try:
-        input_data = pd.DataFrame([input_values], columns=original_feature_cols)
+    input_data = pd.DataFrame([input_data], columns=original_feature_cols)
 
-        # Make prediction using the pipeline
-        prediction_numerical = pipeline.predict(input_data)
+    # Make prediction using the pipeline
+    prediction_numerical = pipeline.predict(input_data)
 
-        # Decode the numerical prediction back to the original label
-        prediction_label = le.inverse_transform(prediction_numerical)
+    # Decode the numerical prediction back to the original label
+    prediction_label = le.inverse_transform(prediction_numerical)
 
-        st.subheader("Hasil Prediksi:")
-
-        # Ambil kode numerik untuk 'Dropout' dan 'Graduate' dari label encoder
-        # Pastikan string 'Dropout' dan 'Graduate' ada di le.classes_
-        dropout_code = -1
-        graduate_code = -1
-
-        # Cari kode numerik berdasarkan kelas yang diketahui oleh LabelEncoder
-        if 'Dropout' in le.classes_:
-            dropout_code = le.transform(['Dropout'])[0]
-        if 'Graduate' in le.classes_:
-            graduate_code = le.transform(['Graduate'])[0]
-        
-        predicted_status_text = ""
-        if prediction_numerical[0] == dropout_code:
-            predicted_status_text = "Dropout"
-            st.error(f"Prediksi Status: **{predicted_status_text}** 😥")
-        elif prediction_numerical[0] == graduate_code:
-            predicted_status_text = "Lulus (Graduate)"
-            st.success(f"Prediksi Status: **{predicted_status_text}** 🎉")
-        else:
-            # Fallback jika label tidak dikenali (seharusnya tidak terjadi jika le.classes_ benar)
-            predicted_status_text = f"Status Tidak Diketahui (Kode: {prediction_numerical[0]})"
-            st.warning(f"Prediksi Status: **{prediction_label[0]}** (Label asli dari model)")
-            st.write(f"Kode numerik yang dihasilkan: {prediction_numerical[0]}")
-            st.write(f"Label encoder classes: {le.classes_}")
-            st.write(f"Mapping yang diharapkan: Dropout -> {dropout_code}, Graduate -> {graduate_code}")
+    st.subheader("Prediction Result:")
+    # Assuming 0 is Dropout and 1 is Graduate based on your previous confusion matrix
+    # If your LabelEncoder mapped them differently, adjust the output message
+    status_mapping = {
+        le.transform(['Dropout'])[0]: 'Dropout', # Get the numerical code for 'Dropout'
+        le.transform(['Graduate'])[0]: 'Graduate' # Get the numerical code for 'Graduate'
+    }
+    predicted_status_text = status_mapping.get(prediction_numerical[0], f"Unknown Status Code: {prediction_numerical[0]}")
 
 
-    except Exception as e:
-        st.error(f"Terjadi kesalahan saat melakukan prediksi: {e}")
-        st.error("Pastikan semua input diisi dengan benar dan model telah dilatih dengan fitur yang sesuai.")
-
+    st.write(f"Predicted Status: **{predicted_status_text}**")
 
 st.markdown("---")
-st.caption("Catatan: Ini adalah model prediktif dan hasilnya harus diinterpretasikan dengan hati-hati.")
-st.caption("Pastikan nilai input akurat dan mencerminkan skala serta makna yang sama dengan data pelatihan.")
+st.write("Note: This is a predictive model and results should be interpreted with caution.")
+st.write("Please ensure input values are accurate and reflect the same scale and meaning as the training data.")
