@@ -360,10 +360,11 @@ original_feature_cols = [
 # --- Prediction ---
 if st.button("Predict Status"):
     # Create a DataFrame from input values with the EXACT original column order
-    input_data = pd.DataFrame([input_data], columns=original_feature_cols)
-
+    input_features_np = np.array([input_data_list])
+    input_df = pd.DataFrame(input_features_np, columns=original_feature_cols)
+    
     # Make prediction using the pipeline
-    prediction_numerical = pipeline.predict(input_data)
+    prediction_numerical = pipeline.predict(input_df)
 
     # Decode the numerical prediction back to the original label
     prediction_label = le.inverse_transform(prediction_numerical)
