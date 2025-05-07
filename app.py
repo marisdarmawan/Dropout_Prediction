@@ -53,32 +53,6 @@ except FileNotFoundError:
     st.error("Model files not found. Please run the training script first to generate 'random_forest_pipeline.pkl' and 'label_encoder.pkl'.")
     st.stop() # Stop the app if files are not found
 
-# --- Streamlit App Interface ---
-st.title("Student Status Prediction (Dropout/Graduate)")
-st.write("Enter student details to predict if they will be a Dropout or a Graduate.")
-
-# Define the list of all original feature columns
-original_feature_cols = [
-    'Marital_status', 'Application_mode', 'Application_order', 'Course',
-    'Daytime_evening_attendance', 'Previous_qualification',
-    'Previous_qualification_grade', 'Nacionality', 'Mothers_qualification',
-    'Fathers_qualification', 'Mothers_occupation', 'Fathers_occupation',
-    'Admission_grade', 'Displaced', 'Educational_special_needs', 'Debtor',
-    'Tuition_fees_up_to_date', 'Gender', 'Scholarship_holder',
-    'Age_at_enrollment', 'International',
-    'Curricular_units_1st_sem_credited',
-    'Curricular_units_1st_sem_enrolled',
-    'Curricular_units_1st_sem_evaluations',
-    'Curricular_units_1st_sem_approved', 'Curricular_units_1st_sem_grade',
-    'Curricular_units_1st_sem_without_evaluations',
-    'Curricular_units_2nd_sem_credited',
-    'Curricular_units_2nd_sem_enrolled',
-    'Curricular_units_2nd_sem_evaluations',
-    'Curricular_units_2nd_sem_approved', 'Curricular_units_2nd_sem_grade',
-    'Curricular_units_2nd_sem_without_evaluations', 'Unemployment_rate',
-    'Inflation_rate', 'GDP'
-]
-
 # --- Dictionaries for Categorical Mapping
 marital_status_map = {
     'Single': 1,
