@@ -384,7 +384,7 @@ if st.button("Predict Status"):
     st.subheader("Prediction Probabilities")
     # Create a dataframe for better display of probabilities
     proba_df = pd.DataFrame({
-        'Outcome': [prediction_map.get(i, f"Class {i}") for i in model.classes_],
+        'Outcome': [prediction_map.get(i, f"Class {i}") for i in pipeline.classes_],
         'Probability': prediction_proba
     })
     st.dataframe(proba_df.style.format({'Probability': "{:.2%}"})) # Format as percentage
