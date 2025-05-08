@@ -376,7 +376,7 @@ if st.button("Predict Status"):
     prediction_proba = pipeline.predict_proba(input_df)
 
     # Decode the numerical prediction back to the original label
-    prediction_label = prediction_map.get(int(prediction), "Unknown Prediction") # Handle potential unexpected prediction values
+    prediction_label = prediction_map.get(int(prediction_numerical), "Unknown Prediction") # Handle potential unexpected prediction values
 
     st.subheader("Prediction Result:")
     st.info(prediction_label)
