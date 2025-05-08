@@ -357,6 +357,12 @@ original_feature_cols = [
     'Inflation_rate', 'GDP'
 ]
 
+# Mapping prediction output to label
+prediction_map = {
+    0: "❌ The student is predicted to **DROP OUT**.",
+    1: "🎓 The student is predicted to **GRADUATE**."    
+}
+
 # --- Prediction ---
 if st.button("Predict Status"):
     # Create a DataFrame from input values with the EXACT original column order
@@ -366,21 +372,22 @@ if st.button("Predict Status"):
     # Make prediction using the pipeline
     prediction_numerical = pipeline.predict(input_df)
 
+    # Predict probability
+    prediction_proba = pipeline.predict_proba(input_df)
+
     # Decode the numerical prediction back to the original label
-    prediction_label = le.inverse_transform(prediction_numerical)
+    prediction_label = prediction_map.get(int(prediction), "Unknown Prediction") # Handle potential unexpected prediction values
 
     st.subheader("Prediction Result:")
-    # Assuming 0 is Dropout and 1 is Graduate based on your previous confusion matrix
-    # If your LabelEncoder mapped them differently, adjust the output message
-    status_mapping = {
-        le.transform(['Dropout'])[0]: 'Dropout', # Get the numerical code for 'Dropout'
-        le.transform(['Graduate'])[0]: 'Graduate' # Get the numerical code for 'Graduate'
-    }
-    predicted_status_text = status_mapping.get(prediction_numerical[0], f"Unknown Status Code: {prediction_numerical[0]}")
+    st.info(prediction_label)
 
-
-    st.write(f"Predicted Status: **{predicted_status_text}**")
+    st.subheader("Prediction Probabilities")
+    # Create a dataframe for better display of probabilities
+    proba_df = pd.DataFrame({
+        'Outcome': [prediction_map.get(i, f"Class {i}") for i in model.classes_],
+        'Probability': prediction_proba
+    })
+    st.dataframe(proba_df.style.format({'Probability': "{:.2%}"})) # Format as percentage
 
 st.markdown("---")
-st.write("Note: This is a predictive model and results should be interpreted with caution.")
-st.write("Please ensure input values are accurate and reflect the same scale and meaning as the training data.")
+st.markdown("© 2025 Mohammad Aris Darmawan")
