@@ -19,10 +19,13 @@ Jumlah dropout yang tinggi ini tentunya menjadi salah satu masalah besar bagi se
 - Menganalisis data dan menentukan fitur-fitur yang signifikan.
 - Membangun prototype aplikasi berbasis Streamlit.
 - Membuat business dashboard menggunakan aplikasi Tableau dan diupload ke website.
+- Seluruh proses menggunakan metode CRISP-DM dan terdokumentasi di Jupyter Notebook.
 
 ### Persiapan
 
 Sumber data: Dataset mahasiswa dari Jaya Jaya Institut (4424 baris, 37 kolom) yang mencakup informasi akademik, latar belakang, dan ekonomi.
+Sumber data pelatihan: UCI Machine Learning Repository
+> Link sumber data : https://doi.org/10.24432/C5MC89
 
 Setup environment:
 ```bash
@@ -52,10 +55,10 @@ Visualisasi ini bertujuan untuk memahami lebih lanjut karakteristik mahasiswa da
 
 Proyek ini membangun pipeline yang terdiri atas:
 
-- Preprocessing (encoding kategori, scaling)
-- Model klasifikasi (RandomForestClassifier)
+- Preprocessing dan Feature Engineering
+- Pembuatan Model klasifikasi (RandomForestClassifier dan Gradient Boosting Classifier)
 - Evaluasi model (classification report dan akurasi)
-- Penyimpanan model (`model.joblib`)
+- Penyimpanan model (`random_forest_pipeline.pkl`)
 - Deploy aplikasi berbasis Streamlit
 
 Untuk menjalankan aplikasi:
@@ -67,7 +70,7 @@ streamlit run app.py
 
 ## Conclusion
 
-Sistem prediksi yang dibangun mampu mengklasifikasikan status mahasiswa dengan akurasi yang cukup baik. Model dapat digunakan sebagai alat bantu dalam menentukan intervensi terhadap mahasiswa yang berisiko dropout.
+Sistem prediksi yang dibangun mampu mengklasifikasikan status mahasiswa dengan akurasi yang cukup baik (lebih dari 91%). Model dapat digunakan sebagai alat bantu dalam menentukan intervensi terhadap mahasiswa yang berisiko dropout.
 
 ### Rekomendasi Action Items
 
