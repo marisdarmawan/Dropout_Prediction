@@ -15,11 +15,12 @@ Jumlah dropout yang tinggi ini tentunya menjadi salah satu masalah besar bagi se
 
 ### Cakupan Proyek
 
+- Menggunakan metode CRISP-DM untuk memecahkan permasalahan bisnis dengan kaidah data science.
+- Menganalisis data dan mempersiapkan data untuk pembuatan model machine learning.
 - Menyusun pipeline preprocessing dan model machine learning untuk klasifikasi status mahasiswa.
-- Menganalisis data dan menentukan fitur-fitur yang signifikan.
+- Mengevaluasi model machine learning dan Analisa feature importance.
 - Membangun prototype aplikasi berbasis Streamlit.
 - Membuat business dashboard menggunakan aplikasi Tableau dan diupload ke website.
-- Seluruh proses menggunakan metode CRISP-DM dan terdokumentasi di Jupyter Notebook.
 
 ### Persiapan
 
@@ -70,10 +71,11 @@ streamlit run app.py
 
 ## Conclusion
 
-Sistem prediksi yang dibangun mampu mengklasifikasikan status mahasiswa dengan akurasi yang cukup baik (lebih dari 91%). Model dapat digunakan sebagai alat bantu dalam menentukan intervensi terhadap mahasiswa yang berisiko dropout.
+Terdapat beberapa factor yang mempengaruhi drop outnya mahasiswa. Antara lain, status pernikahan, gender, hutang, jam perkuliahan, niai dan jumlah course di kedua semester. Sistem prediksi yang dibangun mampu mengklasifikasikan status mahasiswa dengan akurasi yang cukup baik (lebih dari 91%). Model dapat digunakan sebagai alat bantu dalam menentukan intervensi terhadap mahasiswa yang berisiko dropout.
 
 ### Rekomendasi Action Items
 
+Berdasarkan hasil Analisa data, dapat saya berikan beberapa rekomendasi untuk Jaya Jaya Institut:
 - Pastikan kualitas pengajaran di semester kedua optimal, karena tingkat kelulusan ditentukan oleh nilai dan banyaknya course yang diambil di semester kedua.
 - Perhatikan Status Pembayaran Uang Kuliah: Siswa yang menunggak pembayaran uang kuliah cenderung memiliki risiko dropout yang lebih tinggi. Berikan solusi pembayaran yang fleksibel dan program keringanan bagi mahasiswa yang membutuhkan.
 - Berikan layanan seperti rekaman kelas dan sesi konsultasi bagi mahasiswa yang kuliah malam.
