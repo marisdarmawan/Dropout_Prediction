@@ -227,6 +227,28 @@ parent_job_map = {
 boolean_map = {'Yes': 1, 'No': 0}
 gender_map = {'Male': 1, 'Female': 0}
 
+# Define the list of all original feature columns
+original_feature_cols = [
+    'Marital_status', 'Application_mode', 'Application_order', 'Course',
+    'Daytime_evening_attendance', 'Previous_qualification',
+    'Previous_qualification_grade', 'Nacionality', 'Mothers_qualification',
+    'Fathers_qualification', 'Mothers_occupation', 'Fathers_occupation',
+    'Admission_grade', 'Displaced', 'Educational_special_needs', 'Debtor',
+    'Tuition_fees_up_to_date', 'Gender', 'Scholarship_holder',
+    'Age_at_enrollment', 'International',
+    'Curricular_units_1st_sem_credited',
+    'Curricular_units_1st_sem_enrolled',
+    'Curricular_units_1st_sem_evaluations',
+    'Curricular_units_1st_sem_approved', 'Curricular_units_1st_sem_grade',
+    'Curricular_units_1st_sem_without_evaluations',
+    'Curricular_units_2nd_sem_credited',
+    'Curricular_units_2nd_sem_enrolled',
+    'Curricular_units_2nd_sem_evaluations',
+    'Curricular_units_2nd_sem_approved', 'Curricular_units_2nd_sem_grade',
+    'Curricular_units_2nd_sem_without_evaluations', 'Unemployment_rate',
+    'Inflation_rate', 'GDP'
+]
+
 # --- Streamlit App Layout ---
 st.set_page_config(layout="wide") # Use wider layout
 st.title("🎓 Student Outcome Prediction")
@@ -341,28 +363,6 @@ if prediction_mode == "Manual Input":
     
     # Convert to NumPy array with the correct shape (1 row, N columns)
     input_data = np.array([input_data_list])
-    
-    # Define the list of all original feature columns
-    original_feature_cols = [
-        'Marital_status', 'Application_mode', 'Application_order', 'Course',
-        'Daytime_evening_attendance', 'Previous_qualification',
-        'Previous_qualification_grade', 'Nacionality', 'Mothers_qualification',
-        'Fathers_qualification', 'Mothers_occupation', 'Fathers_occupation',
-        'Admission_grade', 'Displaced', 'Educational_special_needs', 'Debtor',
-        'Tuition_fees_up_to_date', 'Gender', 'Scholarship_holder',
-        'Age_at_enrollment', 'International',
-        'Curricular_units_1st_sem_credited',
-        'Curricular_units_1st_sem_enrolled',
-        'Curricular_units_1st_sem_evaluations',
-        'Curricular_units_1st_sem_approved', 'Curricular_units_1st_sem_grade',
-        'Curricular_units_1st_sem_without_evaluations',
-        'Curricular_units_2nd_sem_credited',
-        'Curricular_units_2nd_sem_enrolled',
-        'Curricular_units_2nd_sem_evaluations',
-        'Curricular_units_2nd_sem_approved', 'Curricular_units_2nd_sem_grade',
-        'Curricular_units_2nd_sem_without_evaluations', 'Unemployment_rate',
-        'Inflation_rate', 'GDP'
-    ]
     
     # Mapping prediction output to label
     prediction_map = {
