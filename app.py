@@ -404,47 +404,97 @@ else: # prediction_mode == "Upload CSV File"
 
     if uploaded_file is not None:
         try:
-            # Read the CSV file, assuming semicolon delimiter as per data - Copy.csv metadata
-            df_csv = pd.read_csv(uploaded_file, delimiter=';') #
+            df_csv = pd.read_csv(uploaded_file, delimiter=';')
             st.success("CSV file uploaded successfully!")
+            st.write("Preview of uploaded data (first 5 rows):")
             st.dataframe(df_csv.head())
 
-            # --- Column Handling for uploaded CSV ---
-            # Identify columns in CSV that are not in your model's expected features
-            columns_to_drop = [col for col in df_csv.columns if col not in original_feature_cols]
+            # --- Data Type Conversion for Uploaded CSV ---
+            st.write("Attempting to convert relevant columns to numeric types...")
+            df_processed_csv = df_csv.copy() # Work on a copy
 
-            # Drop these columns from the DataFrame
-            if columns_to_drop:
-                st.warning(f"Dropping columns from CSV that are not model features: {', '.join(columns_to_drop)}")
-                df_csv = df_csv.drop(columns=columns_to_drop)
+            # Identify all columns that are expected by the model (original_feature_cols)
+            # and attempt to convert them to numeric if they exist in the uploaded CSV.
+            # This is a broad approach; you could also list specific columns known to be numeric.
+            for col in original_feature_cols:
+                if col in df_processed_csv.columns:
+                    # Convert column to numeric; errors='coerce' will turn unconvertible values into NaN
+                    df_processed_csv[col] = pd.to_numeric(df_processed_csv[col], errors='coerce')
+                # else:
+                    # Optionally, you could warn if an expected column is missing right here,
+                    # but your later checks already cover this.
+
+            # --- Column Handling for uploaded CSV (after type conversion) ---
+            # Identify columns in the processed CSV that are not in your model's expected features
+            columns_to_drop_from_csv = [col for col in df_processed_csv.columns if col not in original_feature_cols]
+
+            if columns_to_drop_from_csv:
+                st.warning(f"Dropping columns from CSV that are not model features: {', '.join(columns_to_drop_from_csv)}")
+                df_processed_csv = df_processed_csv.drop(columns=columns_to_drop_from_csv)
             
-            # Check if all required original_feature_cols are now in df_csv
-            missing_features_after_drop = [f for f in original_feature_cols if f not in df_csv.columns]
+            # Check if all required original_feature_cols are now in df_processed_csv
+            missing_features_after_drop = [f for f in original_feature_cols if f not in df_processed_csv.columns]
             if missing_features_after_drop:
-                st.error(f"Error: The uploaded CSV is missing expected model features: {', '.join(missing_features_after_drop)}. Please ensure your CSV contains all the necessary columns.")
-            elif df_csv.empty:
-                st.warning("The uploaded CSV file is empty after processing.")
+                st.error(f"Error: The uploaded CSV is missing expected model features: {', '.join(missing_features_after_drop)}. Please ensure your CSV contains all the necessary columns with correct names.")
+            elif df_processed_csv.empty and not df_csv.empty: # Check if it became empty after processing
+                 st.warning("The CSV became empty after attempting to select/convert model features. Please check column names and content.")
+            elif df_processed_csv.empty:
+                st.warning("The uploaded CSV file is empty or resulted in an empty dataset after initial processing.")
             else:
                 # Reorder columns to match the training data's feature order
-                df_to_predict = df_csv[original_feature_cols]
+                # and ensure only these columns are present.
+                df_to_predict = df_processed_csv[original_feature_cols].copy()
+
+                # The FeatureEngineer's fillna(0) should handle NaNs introduced by 'coerce'
+                # If you wanted to see NaNs before they go into the pipeline:
+                # if df_to_predict.isnull().any().any():
+                #    st.warning("Some values were converted to NaN (Not a Number) during numeric conversion as they were not valid numbers. These will be filled with 0 by the feature engineering process.")
+                #    st.dataframe(df_to_predict[df_to_predict.isnull().any(axis=1)])
+
 
                 if st.button("Predict All Students"):
                     with st.spinner("Making predictions..."):
                         # Make predictions using the pipeline
                         batch_predictions_numerical = pipeline.predict(df_to_predict)
-                        batch_probabilities = pipeline.predict_proba(df_to_predict)[:, 1] # Probability of graduating (class 1)
+                        batch_probabilities = pipeline.predict_proba(df_to_predict)
 
                         # Create a DataFrame for results
-                        df_results = df_csv.copy() # Start with the original (cleaned) df_csv
-                        df_results['Predicted_Status'] = [prediction_map.get(int(p), "Unknown") for p in batch_predictions_numerical]
-                        df_results['Probability_Graduate'] = batch_probabilities
-                        df_results['Probability_DropOut'] = 1 - batch_probabilities
+                        # Use the original df_csv for display if you want to show initial data alongside predictions
+                        # or df_to_predict if you want to show the data as it went into the model (after cleaning)
+                        df_results = df_csv.loc[df_to_predict.index].copy() # Align with rows that were actually predicted
+
+                        # Map predictions to labels
+                        prediction_map = {
+                            0: "❌ DROP OUT", # Simplified for CSV output
+                            1: "🎓 GRADUATE"
+                        }
+                        df_results['Predicted_Status_Code'] = batch_predictions_numerical
+                        df_results['Predicted_Status_Label'] = [prediction_map.get(int(p), "Unknown") for p in batch_predictions_numerical]
+                        
+                        # Assign probabilities for each class correctly
+                        # Assuming pipeline.classes_ is [0, 1] corresponding to Dropout, Graduate
+                        if len(pipeline.classes_) == 2:
+                             # Find index for dropout (0) and graduate (1)
+                            try:
+                                dropout_idx = list(pipeline.classes_).index(0)
+                                graduate_idx = list(pipeline.classes_).index(1)
+                                df_results['Probability_DropOut'] = batch_probabilities[:, dropout_idx]
+                                df_results['Probability_Graduate'] = batch_probabilities[:, graduate_idx]
+                            except ValueError:
+                                st.error("Could not find expected classes (0 and 1) in pipeline.classes_.")
+                                # Fallback or skip probability columns
+                                df_results['Probability_DropOut'] = 'N/A'
+                                df_results['Probability_Graduate'] = 'N/A'
+
+                        else: # Handle cases with different class structures if necessary
+                            st.warning(f"Expected 2 classes but found {len(pipeline.classes_)}. Probabilities might not be correctly assigned.")
+
 
                         st.subheader("Batch Prediction Results:")
                         st.dataframe(df_results)
 
                         # Provide download button
-                        csv_output = df_results.to_csv(index=False).encode('utf-8')
+                        csv_output = df_results.to_csv(index=False, sep=';').encode('utf-8') # Using semicolon for consistency
                         st.download_button(
                             label="Download Predictions CSV",
                             data=csv_output,
@@ -454,8 +504,7 @@ else: # prediction_mode == "Upload CSV File"
                         st.success("Predictions complete!")
 
         except Exception as e:
-            st.error(f"An error occurred while processing the CSV file: {e}. Please ensure it's a valid CSV with the correct delimiter (;).")
-
+            st.error(f"An error occurred while processing the CSV file: {e}. Please ensure it's a valid CSV with the correct delimiter (;) and that numeric columns contain valid numbers.")
 
 st.markdown("---")
 st.markdown("© 2025 Mohammad Aris Darmawan")
