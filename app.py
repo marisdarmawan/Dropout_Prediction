@@ -54,11 +54,11 @@ class CustomLabelEncoder(BaseEstimator, TransformerMixin):
         return X_transformed
 
 # --- Load the trained pipeline ---
-# Make sure 'student_status_pipeline.pkl' is in the same directory as this app.py
+# Make sure 'random_forest_pipeline.pkl' is in the same directory as this app.py
 try:
-    pipeline = joblib.load('student_status_pipeline.pkl')
+    pipeline = joblib.load('random_forest_pipeline.pkl')
 except FileNotFoundError:
-    st.error("Error: 'student_status_pipeline.pkl' not found. Please ensure the trained model pipeline is in the same directory.")
+    st.error("Error: 'random_forest_pipeline.pkl' not found. Please ensure the trained model pipeline is in the same directory.")
     st.stop()
 
 # --- Define feature columns and prediction map ---
