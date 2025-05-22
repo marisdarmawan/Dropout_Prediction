@@ -465,8 +465,8 @@ else: # prediction_mode == "Upload CSV File"
 
                         # Map predictions to labels
                         prediction_map = {
-                            0: "❌ DROP OUT", # Simplified for CSV output
-                            1: "🎓 GRADUATE"
+                            0: "DROP OUT", # Simplified for CSV output
+                            1: "GRADUATE"
                         }
                         df_results['Predicted_Status_Code'] = batch_predictions_numerical
                         df_results['Predicted_Status_Label'] = [prediction_map.get(int(p), "Unknown") for p in batch_predictions_numerical]
